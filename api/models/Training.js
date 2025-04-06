@@ -28,4 +28,6 @@ const TrainingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+
+
 export default mongoose.model("Training", TrainingSchema);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FileText, FileVideo, FileSpreadsheet, File } from "lucide-react";
 
 export default function EgitimPage() {
   const [trainings, setTrainings] = useState([]);
@@ -8,15 +9,14 @@ export default function EgitimPage() {
     title: "",
     description: "",
     department: "",
-    contentUrl: "",
+    contentFile: null,
   });
+  const [editingId, setEditingId] = useState(null);
 
   const fetchTrainings = async () => {
     const token = localStorage.getItem("token");
     const res = await fetch("http://localhost:5003/api/training", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
     setTrainings(data);
@@ -27,51 +27,61 @@ export default function EgitimPage() {
   }, []);
 
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value, files } = e.target;
+    setForm((prev) => ({ ...prev, [name]: files ? files[0] : value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem("token");
 
-    const res = await fetch("http://localhost:5003/api/training", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(form),
+    const formData = new FormData();
+    Object.entries(form).forEach(([key, value]) => {
+      if (value) formData.append(key, value);
     });
 
-    const data = await res.json();
+    const url = editingId
+      ? `http://localhost:5003/api/training/${editingId}`
+      : "http://localhost:5003/api/training";
+
+    const method = editingId ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
     if (res.ok) {
-      setTrainings((prev) => [data.training, ...prev]);
-      setForm({ title: "", description: "", department: "", contentUrl: "" });
-    } else {
-      alert(data.message);
+      fetchTrainings();
+      setForm({ title: "", description: "", department: "", contentFile: null });
+      setEditingId(null);
     }
   };
 
   const handleDelete = async (id) => {
     const token = localStorage.getItem("token");
-
+  
     const res = await fetch(`http://localhost:5003/api/training/${id}`, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
+  
+    if (res.ok) fetchTrainings();
+  };
 
-    if (res.ok) {
-      setTrainings((prev) => prev.filter((t) => t._id !== id));
-    }
+  const getFileIcon = (url) => {
+    if (url.match(/\.(pdf)$/)) return <FileText className="w-5 h-5" />;
+    if (url.match(/\.(mp4|mov|avi)$/)) return <FileVideo className="w-5 h-5" />;
+    if (url.match(/\.(xls|xlsx|csv)$/)) return <FileSpreadsheet className="w-5 h-5" />;
+    return <File className="w-5 h-5" />;
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-white shadow rounded-xl mt-8">
-      <h1 className="text-2xl font-bold mb-4">🎓 Eğitim Yönetimi</h1>
+    <div className="max-w-5xl mx-auto p-8 bg-white shadow-lg rounded-xl">
+      <h1 className="text-3xl font-bold mb-6">🎓 Eğitim Yönetimi</h1>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4 mb-8">
         <input
           type="text"
           name="title"
@@ -79,81 +89,58 @@ export default function EgitimPage() {
           value={form.title}
           onChange={handleChange}
           required
-          className="p-2 border rounded"
+          className="p-3 border rounded-xl"
         />
         <select
           name="department"
           value={form.department}
           onChange={handleChange}
           required
-          className="p-2 border rounded"
+          className="p-3 border rounded-xl"
         >
           <option value="">Departman Seç</option>
-          {[
-            "İnsan Kaynakları",
-            "Satış & Pazarlama",
-            "Bilgi Sistemleri",
-            "Kat Hizmetleri",
-            "Güvenlik",
-            "Teknik Servis",
-            "Satınalma",
-            "Muhasebe",
-            "Mutfak",
-            "Yiyecek & İçecek",
-            "Animasyon",
-            "Kalite",
-            "Ön Büro",
-          ].map((dep) => (
+          {["İnsan Kaynakları", "Satış & Pazarlama", "Bilgi Sistemleri", "Kat Hizmetleri", "Güvenlik", "Teknik Servis", "Satınalma", "Muhasebe", "Mutfak", "Yiyecek & İçecek", "Animasyon", "Kalite", "Ön Büro"].map((dep) => (
             <option key={dep}>{dep}</option>
           ))}
         </select>
         <input
-          type="text"
-          name="contentUrl"
-          placeholder="İçerik Linki (PDF, video, vs)"
-          value={form.contentUrl}
+          type="file"
+          name="contentFile"
           onChange={handleChange}
-          required
-          className="p-2 border rounded col-span-2"
+          className="p-3 border rounded-xl col-span-2"
         />
         <textarea
           name="description"
           placeholder="Açıklama"
           value={form.description}
           onChange={handleChange}
-          className="p-2 border rounded col-span-2"
+          className="p-3 border rounded-xl col-span-2"
         />
         <button
           type="submit"
-          className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 col-span-2"
+          className={`${editingId ? "bg-green-500" : "bg-blue-500"} col-span-2 text-white py-2 px-4 rounded-xl hover:shadow-xl`}
         >
-          Ekle
+          {editingId ? "Güncelle" : "Ekle"}
         </button>
       </form>
 
-      <ul className="space-y-4">
+      <div className="space-y-4">
         {trainings.map((t) => (
-          <li
-            key={t._id}
-            className="border p-4 rounded flex justify-between items-start"
-          >
+          <div key={t._id} className="border p-5 rounded-xl flex justify-between items-start hover:shadow-md transition-shadow">
             <div>
-              <h3 className="text-lg font-semibold">{t.title}</h3>
-              <p className="text-sm text-gray-600">{t.description}</p>
-              <p className="text-xs text-blue-600 mt-1">{t.contentUrl}</p>
-              <span className="text-xs text-white bg-blue-500 px-2 py-1 rounded inline-block mt-2">
-                {t.department}
-              </span>
+              <h3 className="text-xl font-semibold mb-2">{t.title}</h3>
+              <p className="text-gray-600 mb-2">{t.description}</p>
+              <a href={`http://localhost:5003/${t.contentUrl}`} target="_blank" className="text-blue-600 underline flex gap-2 items-center">
+                {getFileIcon(t.contentUrl)} İçerik Görüntüle
+              </a>
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block mt-3">{t.department}</span>
             </div>
-            <button
-              onClick={() => handleDelete(t._id)}
-              className="text-red-500 hover:underline text-sm"
-            >
+            <button onClick={() => handleDelete(t._id)} className="text-red-500 hover:underline">
               Sil
             </button>
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
